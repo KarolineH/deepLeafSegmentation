@@ -1,0 +1,2 @@
+model_capture:realsense_gazebo_plugin-melodic-devel
+-DCATKIN_DEVEL_PREFIX=/home/karo/Desktop/DeepLeaveSegmentation/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/karo/Desktop/DeepLeaveSegmentation/catkin_ws/install -G Unix Makefiles
