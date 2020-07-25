@@ -1,8 +1,0 @@
-prefix=/home/karo/Desktop/DeepLeaveSegmentation/catkin_ws/devel
-
-Name: model_capture
-Description: Description of model_capture
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

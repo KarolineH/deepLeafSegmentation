@@ -1,8 +1,0 @@
-prefix=/home/karo/Desktop/DeepLeaveSegmentation/catkin_ws/devel
-
-Name: kinfu_ros
-Description: Description of kinfu_ros
-Version: 0.0.0
-Cflags: -I/home/karo/Desktop/DeepLeaveSegmentation/catkin_ws/devel/include -I/home/karo/Desktop/DeepLeaveSegmentation/catkin_ws/src/kinfu_ros-master/include
-Libs: -L${prefix}/lib -lkinfu_ros
-Requires: cv_bridge image_transport rosconsole roscpp sensor_msgs
