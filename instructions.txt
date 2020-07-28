@@ -1,0 +1,5 @@
+LAUNCH VENV (from Desktop)
+source ./venv/bin/activate
+
+RUN A PYTHON TF SCRIPT:
+docker run -it --rm -v $PWD:/tmp -w /tmp tensorflow/tensorflow python ./tf_scripts/script.py
