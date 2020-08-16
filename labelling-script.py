@@ -11,7 +11,7 @@ class Plant_Processor:
         self.number_of_objects = 1 #total number of plant objects to process
         self.terrain = True
         self.capture_partial_cloud = True
-        self.save_seperated_objects = False
+        self.save_seperated_objects = True
         self.file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data', 'original_plant_obj')
         self.save_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data')
         self.resolutionX = 1920
@@ -40,6 +40,7 @@ class Plant_Processor:
             obj_object.location[1] = 0
 
             bpy.ops.mesh.separate(type='MATERIAL') # split the tomato by its different materials (leaves, trunk, stems)
+            self.rename_components()
 
             ''' do operations on the split meshes here '''
             if self.terrain == True:
@@ -48,14 +49,22 @@ class Plant_Processor:
             if self.capture_partial_cloud == True:
                 self.setupCamera() # Here the view can be changed
                 bpy.context.view_layer.update() # Update the view layer once all objects are in place
-                pc_out = self.get_partial_pc(i)
+                pc_out, labels_out = self.get_partial_pc(i)
 
             if self.save_seperated_objects == True:
                 self.save_meshes(i) # saves the split meshes and also deletes them up from the scene
 
             #self.show_point_cloud(pc_out)
 
-            #self.cleanup()
+            self.cleanup()
+
+    def rename_components(self):
+        for obj in list(bpy.data.objects):
+            if 'tomato' in obj.name:
+                obj.name = obj.active_material.name
+
+    def export_clouds(self):
+        pass
 
     def add_terrain(self, i):
         bpy.ops.mesh.landscape_add(refresh=True)
@@ -162,15 +171,14 @@ class Plant_Processor:
 
                 if hit:
                     values[indexX,indexY] = location
-                    labels[indexX,indexY] = hit_object.name
-                    import pdb; pdb.set_trace()
+                    labels[indexX,indexY] = hit_object.name.split('.')[0]
 
                 # update indices
                 indexY += 1
 
             indexX += 1
             indexY = 0
-        return values
+        return values, labels
 
     def show_point_cloud(self, values):
         '''Visualises the captured point cloud in the Blender GUI, Primarily for debugging purposes'''
@@ -208,20 +216,16 @@ class Plant_Processor:
         # reset view mode
         #bpy.context.area.type = mode
 
-        print("Done.")
-
     def save_meshes(self,i):
         '''select the resulting tomato meshes and save them seperately
         meshes are also cleaned from the scene during the saving procedure'''
-        j = 0
         for split_object in bpy.data.objects: # Check for given object names
             bpy.ops.object.select_all(action='DESELECT') # deselect all objects
 
-            if "tomato" in split_object.name or "Landscape" in split_object.name: # now only select the tomato and the ground meshes
+            if not 'Camera' in split_object.name and not 'Light' in split_object.name:
                 split_object.select_set(True) #only select one at a time
-                j += 1
-                dae_save_string = '%s_%s.dae' %(i,j)
-                obj_save_string = '%s_%s.obj' %(i,j)
+                dae_save_string = '%s_%s.dae' %(i,split_object.name.split('.')[0])
+                obj_save_string = '%s_%s.obj' %(i,split_object.name.split('.')[0])
                 dae_save_location = os.path.join(self.save_path, 'split_by_organ_dae', dae_save_string)
                 obj_save_location = os.path.join(self.save_path, 'split_by_organ_obj', obj_save_string)
 
@@ -247,7 +251,6 @@ class Plant_Processor:
                                             use_texture_copies=True,
                                             include_children=True)
                 bpy.ops.object.delete() # remove the exported object from the scene
-
 
 if __name__ == "__main__":
     pproc = Plant_Processor()
