@@ -8,12 +8,14 @@ class Plant_Processor:
 
     def __init__(self):
         # USER INPUT: Set active flags for different operations:
-        self.number_of_objects = 1
+        self.number_of_objects = 1 #total number of plant objects to process
         self.terrain = True
         self.capture_partial_cloud = True
         self.save_seperated_objects = False
         self.file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data', 'original_plant_obj')
         self.save_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data')
+        self.resolutionX = 1920
+        self.resolutionY = 1080
 
     def init_cleanup(self):
         '''Initial clean up of the default scene'''
@@ -36,20 +38,24 @@ class Plant_Processor:
             bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
             obj_object.location[0] = 0
             obj_object.location[1] = 0
-            
+
             bpy.ops.mesh.separate(type='MATERIAL') # split the tomato by its different materials (leaves, trunk, stems)
-            
+
             ''' do operations on the split meshes here '''
             if self.terrain == True:
                 self.add_terrain(i)
 
             if self.capture_partial_cloud == True:
-                self.get_partial_pc(i)
+                self.setupCamera() # Here the view can be changed
+                bpy.context.view_layer.update() # Update the view layer once all objects are in place
+                pc_out = self.get_partial_pc(i)
 
             if self.save_seperated_objects == True:
                 self.save_meshes(i) # saves the split meshes and also deletes them up from the scene
-            
-            self.cleanup()
+
+            #self.show_point_cloud(pc_out)
+
+            #self.cleanup()
 
     def add_terrain(self, i):
         bpy.ops.mesh.landscape_add(refresh=True)
@@ -63,7 +69,7 @@ class Plant_Processor:
         bpy.context.object.ant_landscape.lacunarity = 2
         bpy.context.object.ant_landscape.noise_size = 0.5
         bpy.ops.mesh.ant_landscape_refresh()
-        
+
     def setupCamera(self):
         # Maybe add some noise to the location and orientation of the camera view
         bpy.data.objects['Camera'].location[0] = 0
@@ -72,7 +78,8 @@ class Plant_Processor:
         bpy.data.objects['Camera'].rotation_euler[0] = 0
         bpy.data.objects['Camera'].rotation_euler[1] = 0
         bpy.data.objects['Camera'].rotation_euler[2] = 0
-        
+
+
     def cleanup(self):
         all_objects = list(bpy.data.objects)
         for obj in all_objects:
@@ -106,29 +113,18 @@ class Plant_Processor:
         #fileOutput.base_path = os.path.join(os.path.expanduser('~'), 'Desktop',)
         #links.new(invert.outputs[0], fileOutput.inputs[0])
 
-    def get_partial_pc(self,i):
+        #Get the final depth map:
+        bpy.ops.render.render()
+        img=bpy.data.images['Viewer Node']
+        pixels = img.pixels
 
-        #Using depth map:
-        #bpy.ops.render.render()
-        #img=bpy.data.images['Viewer Node']
-        #pixels = img.pixels
+    def get_partial_pc(self,i):
 
         ''' Capture a partial point cloud (simulated depth camera) using ray casting:
         Adapted from https://blender.stackexchange.com/questions/115285/how-to-do-a-ray-cast-from-camera-originposition-to-object-in-scene-in-such-a-w'''
 
-        # Change camera position and orientation here
-        self.setupCamera()
-        
-        # List all the object relevant for intersection
-        targets = []
-        objects_in_scene = list(bpy.data.objects)
-        for obj in objects_in_scene:
-            if not "Camera" in obj.name and not "Light" in obj.name:
-                targets.append(obj)
-
         # camera object which defines ray source
         cam = bpy.data.objects['Camera']
-
         # save current view mode
         mode = bpy.context.area.type
         # set view mode to 3D to have all needed variables available
@@ -140,71 +136,79 @@ class Plant_Processor:
         bottomLeft = frame[2]
         topLeft = frame[3]
 
-        # number of pixels in X/Y direction
-        resolutionX = int(bpy.context.scene.render.resolution_x * (bpy.context.scene.render.resolution_percentage / 100))
-        resolutionY = int(bpy.context.scene.render.resolution_y * (bpy.context.scene.render.resolution_percentage / 100))
-
         # setup vectors to match pixels
-        xRange = np.linspace(topLeft[0], topRight[0], resolutionX)
-        yRange = np.linspace(topLeft[1], bottomLeft[1], resolutionY)
+        xRange = np.linspace(topLeft[0], topRight[0], self.resolutionX)
+        yRange = np.linspace(topLeft[1], bottomLeft[1], self.resolutionY)
 
         # array to store hit information
         values = np.empty((xRange.size, yRange.size), dtype=object)
-
+        labels = np.empty((xRange.size, yRange.size), dtype=object)
 
         # indices for array mapping
         indexX = 0
         indexY = 0
 
-        # filling array with None
+        # iterate over all X/Y coordinates
         for x in xRange:
             for y in yRange:
-                values[indexX,indexY] = (None, None)
+                # get current pixel vector from camera center to pixel
+                pixelVector = Vector((x, y, topLeft[2]))
+                # rotate that vector according to camera rotation
+                pixelVector.rotate(cam.matrix_world.to_quaternion())
+                origin = cam.location
+
+                # perform the actual ray casting
+                hit, location, norm, face, hit_object, matrix = bpy.context.scene.ray_cast(bpy.context.view_layer,origin,pixelVector)
+
+                if hit:
+                    values[indexX,indexY] = location
+                    labels[indexX,indexY] = hit_object.name
+                    import pdb; pdb.set_trace()
+
+                # update indices
                 indexY += 1
+
             indexX += 1
             indexY = 0
+        return values
 
+    def show_point_cloud(self, values):
+        '''Visualises the captured point cloud in the Blender GUI, Primarily for debugging purposes'''
+        mesh = bpy.data.meshes.new(name='created mesh')
+        bm = bmesh.new()
 
-        # iterate over all targets
-        for target in targets:
-            # calculate origin
-            matrixWorld = target.matrix_world
-            matrixWorldInverted = matrixWorld.inverted()
-            origin = matrixWorldInverted @ cam.matrix_world.translation
+        # iterate over all possible hits
+        for index, location in np.ndenumerate(values):
+            # no hit at this position
+            if location is not None:
+                # add new vertex
+                bm.verts.new((location[0], location[1], location[2]))
 
-            # reset indices
-            indexX = 0
-            indexY = 0
+        # make the bmesh the object's mesh
+        bm.to_mesh(mesh)
+        bm.free()  # always do this when finished
 
-            # iterate over all X/Y coordinates
-            for x in xRange:
-                for y in yRange:
-                    # get current pixel vector from camera center to pixel
-                    pixelVector = Vector((x, y, topLeft[2]))
+        # We're done setting up the mesh values, update mesh object and
+        # let Blender do some checks on it
+        mesh.update()
+        mesh.validate()
 
-                    # rotate that vector according to camera rotation
-                    pixelVector.rotate(cam.matrix_world.to_quaternion())
+        # Create Object whose Object Data is our new mesh
+        obj = bpy.data.objects.new('created object', mesh)
 
-                    # calculate direction vector
-                    destination = matrixWorldInverted @ (pixelVector + cam.matrix_world.translation)
-                    direction = (destination - origin).normalized()
+        # Add *Object* to the scene, not the mesh
+        scene = bpy.context.scene
+        scene.collection.objects.link(obj)
 
-                    # perform the actual ray casting
-                    hit, location, norm, face =  target.ray_cast(origin, direction)
-                    
-                    ##  bpy.context.scene.ray_cast(bpy.context.view_layer,Vector([0,0,2]),Vector([0,0,-1]))
-                    # vectors are origin and direction
+        # Select the new object and make it active
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
 
-                    if hit:
-                        values[indexX,indexY] = (matrixWorld @ location)
+        # reset view mode
+        #bpy.context.area.type = mode
 
-                    # update indices
-                    indexY += 1
-
-                indexX += 1
-                indexY = 0
-            import pdb
-            pdb.set_trace()
+        print("Done.")
 
     def save_meshes(self,i):
         '''select the resulting tomato meshes and save them seperately
@@ -248,4 +252,4 @@ class Plant_Processor:
 if __name__ == "__main__":
     pproc = Plant_Processor()
     pproc.init_cleanup() #First clean the scene
-    pproc.open_and_split()
+    pproc.open_and_split() #Load plant objects in a loop and perform operations on them
