@@ -1,22 +1,19 @@
 import os
 import sys
 import datetime
-
-sys.path.insert(0, './')
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 import tensorflow as tf
 from tensorflow import keras
-
 from models.sem_seg_model import SEM_SEG_Model
+import numpy as np
+
+
+sys.path.insert(0, './')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-
-tf.random.set_seed(42)
-
+tf.random.set_seed(42) #random samples will be the same for each execution of this program
 
 def load_dataset(in_file, batch_size):
 
@@ -57,13 +54,38 @@ def load_dataset(in_file, batch_size):
 
 	return dataset
 
+def load_dummy_data(file, batch_size):
+	# some dummy data
+	data = np.random.rand(480,480,3)
+	labels = np.random.randint(5, size=(480,480,1))
+	#unroll the point clouds into 1 dimension
+	data = data.reshape(data.shape[0] * data.shape[1], data.shape[2])
+	labels = labels.reshape(labels.shape[0] * labels.shape[1], labels.shape[2])
+	# stack multiple examples to a whole set
+	inp = np.stack((data,data,data,data))
+	outp = np.stack((labels,labels,labels,labels))
+	weirdin = (tf.convert_to_tensor(inp),tf.convert_to_tensor(outp))
+	dataset = tf.data.Dataset.from_tensor_slices(weirdin)
+	batches = dataset.batch(batch_size, drop_remainder=True)
+	return batches
 
 def train():
 
 	model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
 
-	train_ds = load_dataset(config['train_ds'], config['batch_size'])
-	val_ds = load_dataset(config['val_ds'], config['batch_size'])
+	#train_ds = load_dataset(config['train_ds'], config['batch_size'])
+	#val_ds = load_dataset(config['val_ds'], config['batch_size'])
+
+	train_ds = load_dummy_data(config['train_ds'], config['batch_size'])
+	val_ds = load_dummy_data(config['train_ds'], config['batch_size'])
+
+	# thingy = list(val_ds.as_numpy_iterator())
+	# thingy[0][0][:,0:100,:].shape
+	# model.call(thingy[0][0][:,0:100,:])
+	# model.call(thingy[0][0][0:1,0:100,:]) # only a single batch, size can be changed
+
+	import pdb; pdb.set_trace()
+
 
 	callbacks = [
 		keras.callbacks.TensorBoard(
@@ -100,7 +122,7 @@ if __name__ == '__main__':
 		'log_dir' : 'scannet_1',
 		'log_freq' : 10,
 		'test_freq' : 100,
-		'batch_size' : 4,
+		'batch_size' : 2,
 		'num_classes' : 21,
 		'lr' : 0.001,
 		'bn' : False,

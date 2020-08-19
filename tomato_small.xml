@@ -8,10 +8,10 @@
     <param name='Scale' value='0.15'/>
     <param name='ScaleV' value='0.05'/>
     <param name='BaseSize' value='0.0'/>
-    <param name='Ratio' value='0.01'/>
+    <param name='Ratio' value='0.015'/>
     <param name='RatioPower' value='2.0'/>
-    <param name='Flare' value='0.05'/>
-    <param name='Lobes' value='0'/>
+    <param name='Flare' value='0.02'/>
+    <param name='Lobes' value='1'/>
     <param name='LobeDepth' value='0.0'/>
     <param name='Smooth' value='0.5'/>
     <param name='Leaves' value='3'/>
@@ -29,7 +29,7 @@
     <param name='PruneWidth' value='0.5'/>
     <param name='PruneWidthPeak' value='0.5'/>
     <param name='0Scale' value='1.0'/>
-    <param name='0ScaleV' value='2.0'/>
+    <param name='0ScaleV' value='1.0'/>
     <param name='0BaseSplits' value='0'/>
     <!-- level 0 -->
     <param name='0DownAngle' value='0.0'/>
@@ -64,7 +64,7 @@
     <param name='1CurveRes' value='5'/>
     <param name='1Curve' value='20.0'/>
     <param name='1CurveBack' value='50.0'/>
-    <param name='1CurveV' value='15.0'/>
+    <param name='1CurveV' value='20.0'/>
     <!-- level 2 -->
     <param name='2DownAngle' value='30.0'/>
     <param name='2DownAngleV' value='0.0'/>
