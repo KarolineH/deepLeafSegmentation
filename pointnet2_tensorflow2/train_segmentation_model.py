@@ -45,6 +45,7 @@ def load_dataset(in_file, batch_size):
 		return points, labels
 
 	dataset = tf.data.TFRecordDataset(in_file)
+	import pdb; pdb.set_trace()
 	dataset = dataset.shuffle(shuffle_buffer)
 	dataset = dataset.map(_extract_fn)
 	dataset = dataset.map(_preprocess_fn)

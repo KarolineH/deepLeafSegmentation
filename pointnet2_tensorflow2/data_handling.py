@@ -67,7 +67,3 @@ o3d.visualization.draw_geometries([pcd], zoom=0.3412,
                                   lookat=[2.6172, 2.0475, 1.532],
                                   up=[-0.0694, -0.9768, 0.2024])
 pdb.set_trace()
-
-
-
-data = pickle.load( open( "1_partial_clouds.pickle", "rb" ) )

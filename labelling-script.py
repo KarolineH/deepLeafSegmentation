@@ -16,10 +16,10 @@ class Plant_Processor:
         self.save_seperated_objects = True
         self.file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data', 'original_plant_obj')
         self.save_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data')
-        self.resolutionX = 480
-        self.resolutionY = 480
+        self.resolutionX = 240
+        self.resolutionY = 240
         self.camera_shots = [(0,0),(20,45),(40,-45)] # A list of camera shots to take of all plants, given as view angle and rotation in degrees
-        self.output_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data', 'partial_cloud_pickles')
+        self.output_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data', 'partial_cloud_pickles_lowres')
 
         # More setup operations
         bpy.context.scene.render.resolution_x = self.resolutionX
@@ -278,8 +278,8 @@ class Plant_Processor:
                 split_object.select_set(True) #only select one at a time
                 dae_save_string = '%s_%s.dae' %(i,split_object.name.split('.')[0])
                 obj_save_string = '%s_%s.obj' %(i,split_object.name.split('.')[0])
-                dae_save_location = os.path.join(self.save_path, 'split_by_organ_dae', dae_save_string)
-                obj_save_location = os.path.join(self.save_path, 'split_by_organ_obj', obj_save_string)
+                dae_save_location = os.path.join(self.save_path, 'split_by_organ_dae_lowres', dae_save_string)
+                obj_save_location = os.path.join(self.save_path, 'split_by_organ_obj_lowres', obj_save_string)
 
                 bpy.ops.export_scene.obj(filepath=obj_save_location,
                                             use_selection=True,
