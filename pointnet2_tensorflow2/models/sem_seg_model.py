@@ -144,7 +144,6 @@ class SEM_SEG_Model(Model):
 		loss = self.compiled_loss(input[1], pred)
 
 		self.compiled_metrics.update_state(input[1], pred)#, sample_weight=input[2])
-
 		return {m.name: m.result() for m in self.metrics}
 
 
