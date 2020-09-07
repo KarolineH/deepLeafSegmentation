@@ -11,8 +11,9 @@ import open3d as o3d
 from sklearn.metrics import roc_curve, roc_auc_score, confusion_matrix
 from matplotlib import pyplot
 import seaborn
+from scipy import io
 
-def initialise(dataset_name, directory, num_classes, reload):
+def initialise(dataset_name, directory, num_classes, reload, numfiles):
     sys.path.insert(0, './')
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -23,13 +24,12 @@ def initialise(dataset_name, directory, num_classes, reload):
     tfr_path = os.path.join(directory, 'tf_records', '{}_0.tfrecord'.format(dataset_name))
     if reload == True or not os.path.isfile(tfr_path):
         inpath = os.path.join(directory, 'partial_cloud_pickles_{}'.format(dataset_name))
-        write_dataset_to_tfrecord(inpath,tfr_path, dataset_name, num_classes)
+        write_dataset_to_tfrecord(inpath,tfr_path, dataset_name, num_classes, num_files = numfiles)
 
-def write_dataset_to_tfrecord(inpath, outpath, dataset_name, num_classes):
+def write_dataset_to_tfrecord(inpath, outpath, dataset_name, num_classes, num_files = 10):
     # Adapted from https://stackoverflow.com/questions/61720708/how-do-you-save-a-tensorflow-dataset-to-a-file
     prevalence = np.zeros(num_classes)
     ds = None
-    num_files = 10
     # loop and count the prevalence of all classes
     for i in range(1,num_files+1):
         label_string = "%d.0_labels.pickle" %i
@@ -40,6 +40,7 @@ def write_dataset_to_tfrecord(inpath, outpath, dataset_name, num_classes):
             num = list(labels.flatten()).count(i)
             prevalence[i] += num # count the prevalence of each class seperately
     class_weights = 1 - (prevalence / sum(prevalence))
+
 
     # loop and load all split files
     for i in range(1,num_files+1):
@@ -153,27 +154,6 @@ class UpdatedMeanIoU(tf.keras.metrics.MeanIoU):
         y_pred = tf.math.argmax(y_pred, axis=-1)
         return super().update_state(y_true, y_pred, sample_weight)
 
-# class WeightedSparseCategoricalCrossentropy(tf.keras.losses.Loss):
-#     def init(self, class_weights):
-#         self.unweighted_loss_function = tf.keras.losses.SparseCategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
-#         self.class_weights = class_weights # dictionary of weightings
-#
-#         super(WeightedSparseCategoricalCrossentropy, self).init()
-#     def __init__(self, class_weights):
-#         self.unweighted_loss_function = tf.keras.losses.SparseCategoricalCrossentropy(reduction=None)
-#         self.class_weights = class_weights
-#
-#         super(WeightedSparseCategoricalCrossentropy, self).__init__()
-#
-#     def __call__(self, y_true, y_pred, sample_weight=None):
-#         elementwise_unweighted_loss = self.unweighted_loss_function(y_true, y_pred)
-#         elementwise_class_penalty = self.class_weights[y_true] # assuming y_true is an array of zero-indexed integers
-#
-#         elementwise_weighted_loss = elementwise_class_penalty * elementwise_unweighted_loss
-#         weighted_loss = tf.math.reduce_sum(elementwise_weighted_loss, axis=None)
-#         return weighted_loss
-
-
 def train(train_ds, val_ds, epochs, num_classes, resume_training):
     model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
     logdir = './logs/{}/model/weights'.format(config['log_dir'])
@@ -209,7 +189,7 @@ def train(train_ds, val_ds, epochs, num_classes, resume_training):
     )
 
 def test_net(test_set):
-    model_nr = 250
+    model_nr = 120
     model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
     logdir = './logs/{}/model/weights'.format(config['log_dir'])
     model.build((config['batch_size'], 57600, 3))
@@ -220,27 +200,64 @@ def test_net(test_set):
     )
     save_string = logdir + "/saved-model-{}".format(model_nr)
     model.load_weights(save_string)
-    test_batched = test_set.batch(8, drop_remainder=True)
-
+    test_batched = test_set.batch(config['batch_size'], drop_remainder=True)
     pred = model.predict(test_batched)
 
     #results = model.evaluate(test_batched)
-    #precision_recall_curve(pred, test_batched)
+    import pdb; pdb.set_trace()
+    #print("test set metrics: " + results)
+    precision_recall_curve(pred, test_batched)
     calc_confusion_matrix(pred, test_batched)
 
-def visualise_predictions(path, dataset):
-    model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
-    model.build((config['batch_size'], 57600, 3))
-    model.load_weights(path)
+def real_world_data_test():
+    matr = io.loadmat('testcloud_realcrop.mat')
+    pc = matr['single_example']
+    pc_model_format = np.expand_dims(pc, axis=0)
+    ds = tf.data.Dataset.from_tensor_slices((tf.convert_to_tensor(pc_model_format.astype(np.float32))))
+    batchds = ds.batch(1, drop_remainder=True)
 
-    batch = next(iter(dataset))
-    cloud_nr = 0
+    model_nr = 120
+    model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
+    logdir = './logs/{}/model/weights'.format(config['log_dir'])
+    model.build((config['batch_size'], 57600, 3))
+    model.compile(
+    optimizer=keras.optimizers.Adam(config['lr']),
+    loss=keras.losses.SparseCategoricalCrossentropy(),
+    metrics=[keras.metrics.SparseCategoricalAccuracy(), UpdatedMeanIoU(num_classes = config['num_classes'])]
+    )
+    save_string = logdir + "/saved-model-{}".format(model_nr)
+    model.load_weights(save_string)
+
+    pred = model.predict(batchds)
+    pred_labels = np.argmax(pred[0,:,:],axis=1)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc)
+    rgb_codes = np.array([(0.271, 0.372, 0.631),(0.94, 0.94, 0.114),(1, 1, 1),(0.835,0.345,0.243), (0,0,0)])
+    pcd.colors = o3d.utility.Vector3dVector(rgb_codes[pred_labels])
+    o3d.io.write_point_cloud("cloud_vis/realworld_pred_cloud.pcd", pcd)
+
+def visualise_predictions(dataset, cloudnr):
+    model_nr = 120
+    model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
+    logdir = './logs/{}/model/weights'.format(config['log_dir'])
+    model.build((config['batch_size'], 57600, 3))
+    model.compile(
+    optimizer=keras.optimizers.Adam(config['lr']),
+    loss=keras.losses.SparseCategoricalCrossentropy(),
+    metrics=[keras.metrics.SparseCategoricalAccuracy(), UpdatedMeanIoU(num_classes = config['num_classes'])]
+    )
+    save_string = logdir + "/saved-model-{}".format(model_nr)
+    model.load_weights(save_string)
+    test_batched = dataset.batch(config['batch_size'], drop_remainder=True)
+
+    batch = next(iter(test_batched))
+    cloud_nr = cloudnr
     example = np.expand_dims(batch[0][cloud_nr,:,:], axis=0)
     prediction = model.call(example)
     pred_labels = np.argmax(prediction[0,:,:],axis=1)
     true_labels = batch[1][cloud_nr,:,:]
 
-    rgb_codes = np.array([(0, 255, 0),(255, 0, 0),(0, 0, 0),(0, 0, 255),(0, 255, 255)])
+    rgb_codes = np.array([(0.271, 0.372, 0.631),(0.94, 0.94, 0.114),(1, 1, 1),(0.835,0.345,0.243), (0,0,0)])
     pcd = o3d.geometry.PointCloud()
     xyz = np.squeeze(example)
     pcd.points = o3d.utility.Vector3dVector(xyz)
@@ -248,9 +265,19 @@ def visualise_predictions(path, dataset):
     pcd_truth = copy.deepcopy(pcd)
     pcd_truth.colors =  o3d.utility.Vector3dVector(rgb_codes[np.squeeze(true_labels)])
 
-    o3d.visualization.draw_geometries([pcd])
+    import pdb; pdb.set_trace()
+    o3d.io.write_point_cloud("cloud_vis/{}_pred_cloud.pcd".format(config['dataset_name']), pcd)
+    o3d.io.write_point_cloud("cloud_vis/{}_truth_cloud.pcd".format(config['dataset_name']), pcd_truth)
 
-    o3d.visualization.draw_geometries([pcd_truth])
+    #o3d.visualization.draw_geometries([pcd])
+    #o3d.visualization.draw_geometries([pcd_truth])
+
+    error_vector = np.where(pred_labels == np.squeeze(true_labels), 4, 0)
+    error_pcd = copy.deepcopy(pcd)
+    error_pcd.colors = o3d.utility.Vector3dVector(rgb_codes[error_vector])
+    o3d.io.write_point_cloud("cloud_vis/{}_error_cloud.pcd".format(config['dataset_name']), error_pcd)
+    #o3d.visualization.draw_geometries([pcd])
+    import pdb; pdb.set_trace()
 
 def calc_confusion_matrix(pred, dataset):
     for i,batch in enumerate(dataset):
@@ -261,9 +288,22 @@ def calc_confusion_matrix(pred, dataset):
 
     single_predictions = tf.math.argmax(pred, axis=-1).numpy()
     labels = np.squeeze(true_labels)
-    cm = confusion_matrix(single_predictions.flatten(), labels.flatten())
-    seaborn.heatmap(cf_matrix, annot=True)
+    cm = confusion_matrix(labels.flatten(), single_predictions.flatten())
+    seaborn.heatmap(cm, annot=True)
+    # Frequency table for all (mis-)classifications
+    # true label in rows, predicted label in columns
+    # diagonals over all is the same as categorial accuracy
+    # binary accuracy per class is calculated per row
+    binary_accuracies = []
+    ious = []
+    for i, label_class in enumerate(cm):
+        binary_accuracies.append(label_class[i] / sum(label_class))
+
+        ious.append(cm[i,i] / (sum(cm[i]) + sum(cm[:,i]) - cm[i,i]))
     import pdb; pdb.set_trace()
+    print("Binary classification accuracies per class: " + binary_accuracies)
+    print("Intersection over union per class: " + ious)
+    print("Confusion matrix (ground truth labels in rows): " + cm)
 
 def precision_recall_curve(pred, dataset):
     true_labels = None
@@ -277,8 +317,9 @@ def precision_recall_curve(pred, dataset):
     binary_true_labels = np.squeeze(np.where(true_labels == 1, 1, 0))
     fpr, tpr, thresholds = roc_curve(binary_true_labels.flatten(), leaf_probability.flatten())
     auc = roc_auc_score(binary_true_labels.flatten(), leaf_probability.flatten())
+    import pdb; pdb.set_trace()
 
-    pyplot.plot(fpr, tpr, marker='.', label='PointNet++')
+    pyplot.plot(fpr, tpr, marker='.', label='PointNet++', markersize = 3)
     pyplot.plot(range(0,2), range(0,2), linestyle='--', label='No Skill')
     # axis labels
     pyplot.xlabel('False Positive Rate')
@@ -293,13 +334,14 @@ if __name__ == '__main__':
 
     config = {
         'dataset_name' : 'lowres',
+        'num_files' : 10,
         'reload_data' : False,
-        'data_directory' : os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data'),
+        'data_directory' : os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeafSegmentation', 'synth_data'),
         'train_dim' : 57600,
         'log_dir' : 'sem_seg_final_long',
         'log_freq' : 10,
         'test_freq' : 100,
-        'batch_size' : 8,
+        'batch_size' : 1,
         'num_classes' : 4,
         'lr' : 0.001,
         'bn' : False, # batch normalisation?
@@ -308,10 +350,10 @@ if __name__ == '__main__':
         'starting_epoch': 0
         }
 
-    initialise(config['dataset_name'], config['data_directory'], config['num_classes'], config['reload_data'])
-    data = load_dataset(config['data_directory'], config['dataset_name'], config['batch_size'], config['train_dim'])
-    train_ds, val_ds, test_ds = preprocess_data(data, config['batch_size'])
+    initialise(config['dataset_name'], config['data_directory'], config['num_classes'], config['reload_data'], numfiles = config['num_files'])
+    #data = load_dataset(config['data_directory'], config['dataset_name'], config['batch_size'], config['train_dim'])
+    #train_ds, val_ds, test_ds = preprocess_data(data, config['batch_size'])
     #train(train_ds, val_ds, config['epochs'], config['num_classes'], config['load_weights'])
-    #visualise_predictions('./logs/sem_seg_multiclass_0.001_retry/model/weights', val_ds)
-    #precision_recall_curve('./logs/sem_seg_multiclass_0.001_retry/model/weights', val_ds)
-    test_net(test_ds)
+    #visualise_predictions(test_ds, cloudnr = 3) # or test set here
+    #test_net(test_ds)
+    real_world_data_test()
