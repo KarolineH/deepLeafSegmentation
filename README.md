@@ -1,10 +1,6 @@
-# DeepLeaveSegmentation
+# DeepLeafSegmentation
 Robotics and Autonomous Systems MSc project
 
-- plant_generator.sh creates the original synthetic plant models using arbaro (deterministic procedure)
-- labelling-script.py splits the models into seperate organs (saves both .dae and .obj) run "./blender/blender --background --python labelling-script.py"
-- sample_points.sh samples points from the seperate meshes (.ply format)
-
-
-Run CloudCompare: from anywhere run "cloudcompare.CloudCompare"
-Run Arbaro: navigate to deepLeaveSegmentation/arbaro and run "java -jar arbaro.jar"
+- plant_generator.sh creates 500 original random synthetic plant models using arbaro (deterministic procedure)
+- labelling-script.py splits the models into seperate organs and captures annotated 3D point clouds from different viewing angles (run "./blender/blender --background --python labelling-script.py")
+- pointnet2_tensorflow2/train_seg_net.py holds the custom PointNet++ implementation and testing procedures
