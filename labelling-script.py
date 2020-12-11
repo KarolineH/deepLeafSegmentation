@@ -14,12 +14,12 @@ class Plant_Processor:
         self.terrain = True
         self.capture_partial_cloud = True
         self.save_seperated_objects = True
-        self.file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data', 'original_plant_obj')
-        self.save_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data')
+        self.file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeafSegmentation', 'synth_data', 'original_plant_obj')
+        self.save_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeafSegmentation', 'synth_data')
         self.resolutionX = 240
         self.resolutionY = 240
         self.camera_shots = [(0,0),(20,45),(40,-45)] # A list of camera shots to take of all plants, given as view angle and rotation in degrees
-        self.output_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeaveSegmentation', 'synth_data', 'partial_cloud_pickles_lowres')
+        self.output_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeafSegmentation', 'synth_data', 'partial_cloud_pickles_3class')
 
         # More setup operations
         bpy.context.scene.render.resolution_x = self.resolutionX
@@ -191,7 +191,7 @@ class Plant_Processor:
         bottomLeft = frame[2]
         topLeft = frame[3]
 
-        label_dict = {'Landscape':0, 'leaves':1, 'stems_1':2, 'trunk':3}
+        label_dict = {'Landscape':0, 'leaves':1, 'stems_1':2, 'trunk':2}
 
         # setup vectors to match pixels
         xRange = np.linspace(topLeft[0], topRight[0], self.resolutionX)
@@ -278,8 +278,8 @@ class Plant_Processor:
                 split_object.select_set(True) #only select one at a time
                 dae_save_string = '%s_%s.dae' %(i,split_object.name.split('.')[0])
                 obj_save_string = '%s_%s.obj' %(i,split_object.name.split('.')[0])
-                dae_save_location = os.path.join(self.save_path, 'split_by_organ_dae_lowres', dae_save_string)
-                obj_save_location = os.path.join(self.save_path, 'split_by_organ_obj_lowres', obj_save_string)
+                dae_save_location = os.path.join(self.save_path, 'split_by_organ_dae_3class', dae_save_string)
+                obj_save_location = os.path.join(self.save_path, 'split_by_organ_obj_3class', obj_save_string)
 
                 bpy.ops.export_scene.obj(filepath=obj_save_location,
                                             use_selection=True,

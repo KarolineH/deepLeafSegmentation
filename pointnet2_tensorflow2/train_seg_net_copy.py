@@ -18,6 +18,8 @@ def initialise(dataset_name, directory, num_classes, reload, numfiles):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    if not physical_devices:
+        physical_devices = tf.config.experimental.list_physical_devices('XLA_GPU')
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
     tf.random.set_seed(42) #random samples will be the same for each execution of this program
@@ -189,7 +191,7 @@ def train(train_ds, val_ds, epochs, num_classes, resume_training):
     )
 
 def test_net(test_set):
-    model_nr = 120
+    model_nr = 99
     model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
     logdir = './logs/{}/model/weights'.format(config['log_dir'])
     model.build((config['batch_size'], 57600, 3))
@@ -206,17 +208,17 @@ def test_net(test_set):
     #results = model.evaluate(test_batched)
     import pdb; pdb.set_trace()
     #print("test set metrics: " + results)
-    precision_recall_curve(pred, test_batched)
+    #precision_recall_curve(pred, test_batched)
     calc_confusion_matrix(pred, test_batched)
 
 def real_world_data_test():
-    matr = io.loadmat('testcloud_realcrop.mat')
-    pc = matr['single_example']
+    matr = io.loadmat('testcloud_real_tomato.mat')
+    pc = matr['Untitled']
     pc_model_format = np.expand_dims(pc, axis=0)
     ds = tf.data.Dataset.from_tensor_slices((tf.convert_to_tensor(pc_model_format.astype(np.float32))))
     batchds = ds.batch(1, drop_remainder=True)
 
-    model_nr = 120
+    model_nr = 99
     model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
     logdir = './logs/{}/model/weights'.format(config['log_dir'])
     model.build((config['batch_size'], 57600, 3))
@@ -234,10 +236,10 @@ def real_world_data_test():
     pcd.points = o3d.utility.Vector3dVector(pc)
     rgb_codes = np.array([(0.271, 0.372, 0.631),(0.94, 0.94, 0.114),(1, 1, 1),(0.835,0.345,0.243), (0,0,0)])
     pcd.colors = o3d.utility.Vector3dVector(rgb_codes[pred_labels])
-    o3d.io.write_point_cloud("cloud_vis/realworld_pred_cloud.pcd", pcd)
+    o3d.io.write_point_cloud("cloud_vis/realworld_tomato_pred_cloud_3c.pcd", pcd)
 
 def visualise_predictions(dataset, cloudnr):
-    model_nr = 120
+    model_nr = 99
     model = SEM_SEG_Model(config['batch_size'], config['num_classes'], config['bn'])
     logdir = './logs/{}/model/weights'.format(config['log_dir'])
     model.build((config['batch_size'], 57600, 3))
@@ -257,7 +259,7 @@ def visualise_predictions(dataset, cloudnr):
     pred_labels = np.argmax(prediction[0,:,:],axis=1)
     true_labels = batch[1][cloud_nr,:,:]
 
-    rgb_codes = np.array([(0.271, 0.372, 0.631),(0.94, 0.94, 0.114),(1, 1, 1),(0.835,0.345,0.243), (0,0,0)])
+    rgb_codes = np.array([(0.271, 0.372, 0.631),(0.94, 0.94, 0.114),(0.835,0.345,0.243),(1, 1, 1), (0,0,0)])
     pcd = o3d.geometry.PointCloud()
     xyz = np.squeeze(example)
     pcd.points = o3d.utility.Vector3dVector(xyz)
@@ -333,28 +335,28 @@ def precision_recall_curve(pred, dataset):
 if __name__ == '__main__':
 
     config = {
-        'dataset_name' : 'lowres',
+        'dataset_name' : '3class',
         'num_files' : 10,
         'reload_data' : False,
         'data_directory' : os.path.join(os.path.expanduser('~'), 'Desktop', 'project', 'deepLeafSegmentation', 'synth_data'),
         'train_dim' : 57600,
-        'log_dir' : 'sem_seg_final_long',
+        'log_dir' : 'sem_seg_3class',
         'log_freq' : 10,
         'test_freq' : 100,
-        'batch_size' : 1,
-        'num_classes' : 4,
+        'batch_size' : 8,
+        'num_classes' : 3,
         'lr' : 0.001,
         'bn' : False, # batch normalisation?
         'epochs': 250,
-        'load_weights': False,
-        'starting_epoch': 0
+        'load_weights': True,
+        'starting_epoch': 99
         }
 
     initialise(config['dataset_name'], config['data_directory'], config['num_classes'], config['reload_data'], numfiles = config['num_files'])
     data = load_dataset(config['data_directory'], config['dataset_name'], config['batch_size'], config['train_dim'])
     train_ds, val_ds, test_ds = preprocess_data(data, config['batch_size'])
     #train(train_ds, val_ds, config['epochs'], config['num_classes'], config['load_weights'])
-    #visualise_predictions(test_ds, cloudnr = 3) # or test set here
+    visualise_predictions(test_ds, cloudnr = 4) # or test set here # normally cloud nr = 3
     #test_net(test_ds)
     #real_world_data_test()
     import pdb; pdb.set_trace()

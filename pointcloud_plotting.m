@@ -15,10 +15,10 @@ save('testcloud_realcrop.mat','single_example');
 
 %%
 
-pred = pcread('cloud_vis/crowded_pred_cloud.pcd');
-truth = pcread('cloud_vis/crowded_truth_cloud.pcd');
-error = pcread('cloud_vis/crowded_error_cloud.pcd');
-real = pcread('cloud_vis/realworld_pred_cloud.pcd');
+pred = pcread('cloud_vis/3class_pred_cloud.pcd');
+truth = pcread('cloud_vis/3class_truth_cloud.pcd');
+error = pcread('cloud_vis/3class_error_cloud.pcd');
+real = pcread('cloud_vis/realworld_pred_cloud_3c.pcd');
 
 indx = find(~all(error.Color==0,2));
 error_cloud = pointCloud(error.Location(indx,:));
